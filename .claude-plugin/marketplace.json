@@ -1,0 +1,27 @@
+{
+  "name": "signalcanvas-skills",
+  "owner": {
+    "name": "ByteBard97",
+    "email": "geoffrey.wall@ceresimaging.net"
+  },
+  "metadata": {
+    "description": "Claude Code skills for SignalCanvas development — Vue 3, PatchLang DSL, and code quality rules."
+  },
+  "plugins": [
+    {
+      "name": "vue-signalcanvas",
+      "source": "./plugins/vue-signalcanvas",
+      "description": "Vue 3 + SignalCanvas patterns: provide/inject, composables, modal extraction, file-size gates"
+    },
+    {
+      "name": "patchlang",
+      "source": "./plugins/patchlang",
+      "description": "PatchLang DSL authoring: syntax, templates, instances, ports, bridges, and validation"
+    },
+    {
+      "name": "code-rules",
+      "source": "./plugins/code-rules",
+      "description": "SignalCanvas code quality rules: file size, naming, DRY, no magic numbers, trash not rm"
+    }
+  ]
+}

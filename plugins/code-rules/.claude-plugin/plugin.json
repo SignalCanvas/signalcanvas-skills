@@ -1,0 +1,5 @@
+{
+  "name": "code-rules",
+  "description": "SignalCanvas code quality rules: file size, naming, DRY, no magic numbers, trash not rm",
+  "version": "1.0.0"
+}
