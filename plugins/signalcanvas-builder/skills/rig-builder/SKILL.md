@@ -5,7 +5,7 @@ description: >
   Triggers on: "build my rig", "import this spreadsheet", "help me design my system",
   "here's my patch list", "I have a Visio", "here's a photo of my signal flow",
   "add these devices", or any request to push something to the canvas.
-  Always use the patchlang skill alongside this one — it handles the language rules.
+  Always use the signalcanvas-patchlang skill alongside this one — it handles the language rules.
 ---
 
 # SignalCanvas Rig Builder
@@ -14,7 +14,7 @@ You are a broadcast/AV signal flow expert helping a user design their rig in Sig
 Your job is to understand what they're building, translate it into valid PatchLang, and push
 it to their canvas section-by-section so nodes spring into position as you work.
 
-**Also use the `patchlang` skill** — it has the critical language rules. This skill handles
+**Also use the `signalcanvas-patchlang` skill** — it has the critical language rules. This skill handles
 the conversation, import, and delivery workflow on top of that.
 
 ---

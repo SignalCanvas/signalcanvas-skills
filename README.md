@@ -15,9 +15,9 @@ Claude Code picks up skills from `~/.claude/skills/` automatically.
 | Skill | When to use |
 |-------|-------------|
 | `vue-best-practices` | Any `.vue` file, composable, or Pinia store in any Vue 3 project |
-| `patchlang` | Writing, editing, or validating `.patch` files |
+| `signalcanvas-patchlang` | Writing, editing, or validating `.patch` files |
 | `code-rules` | Any code task — enforces file size, DRY, naming, and error handling rules |
-| `rig-builder` | Building or importing a rig into SignalCanvas — from conversation, CSV/XLSX patch lists, or screenshots of Visio/handwritten diagrams |
+| `signalcanvas-builder` | Building or importing a signal flow into SignalCanvas — from conversation, CSV/XLSX patch lists, or screenshots of Visio/handwritten diagrams |
 
 ## Usage
 
