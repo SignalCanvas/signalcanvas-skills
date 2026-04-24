@@ -5,7 +5,7 @@
     "email": "geoffrey.wall@ceresimaging.net"
   },
   "metadata": {
-    "description": "Claude Code skills for SignalCanvas development — Vue 3, PatchLang DSL, and code quality rules."
+    "description": "Claude Code skills for SignalCanvas development \u2014 Vue 3, PatchLang DSL, and code quality rules."
   },
   "plugins": [
     {
@@ -14,8 +14,8 @@
       "description": "Vue 3 + TypeScript best practices: reactivity, SFC structure, composables, provide/inject, Pinia, component decomposition, file-size gates"
     },
     {
-      "name": "patchlang",
-      "source": "./plugins/patchlang",
+      "name": "signalcanvas-patchlang",
+      "source": "./plugins/signalcanvas-patchlang",
       "description": "PatchLang DSL authoring: syntax, templates, instances, ports, bridges, and validation"
     },
     {
@@ -24,9 +24,9 @@
       "description": "SignalCanvas code quality rules: file size, naming, DRY, no magic numbers, trash not rm"
     },
     {
-      "name": "rig-builder",
-      "source": "./plugins/rig-builder",
-      "description": "Build or import a SignalCanvas rig via MCP — from conversation, CSV/XLSX patch lists, or screenshots. Section-by-section set_patch protocol with spring animation."
+      "name": "signalcanvas-builder",
+      "source": "./plugins/signalcanvas-builder",
+      "description": "Build or import a SignalCanvas rig via MCP \u2014 from conversation, CSV/XLSX patch lists, or screenshots. Section-by-section set_patch protocol with spring animation."
     }
   ]
 }

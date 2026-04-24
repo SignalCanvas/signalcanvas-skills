@@ -1,5 +1,5 @@
 ---
-name: rig-builder
+name: signalcanvas-builder
 description: >
   Use this skill when the user wants to build, import, or design a signal flow rig in SignalCanvas.
   Triggers on: "build my rig", "import this spreadsheet", "help me design my system",

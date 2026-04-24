@@ -1,5 +1,5 @@
 ---
-name: patchlang
+name: signalcanvas-patchlang
 description: >
   PatchLang v0.2.8 language reference for writing, editing, and migrating .patch files.
   Use this skill whenever you are writing or editing a .patch file, converting a hardware
