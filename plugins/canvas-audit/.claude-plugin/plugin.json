@@ -1,0 +1,5 @@
+{
+  "name": "canvas-audit",
+  "description": "Playwright-based VueFlow canvas inspector: extracts node positions, port handles, and edge routes from the live app and detects alignment errors, wire overlaps, node overlaps, and wires routing through nodes.",
+  "version": "1.0.0"
+}

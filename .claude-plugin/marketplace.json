@@ -27,6 +27,11 @@
       "name": "signalcanvas-builder",
       "source": "./plugins/signalcanvas-builder",
       "description": "Build or import a SignalCanvas rig via MCP \u2014 from conversation, CSV/XLSX patch lists, or screenshots. Section-by-section set_patch protocol with spring animation."
+    },
+    {
+      "name": "canvas-audit",
+      "source": "./plugins/canvas-audit",
+      "description": "Playwright VueFlow canvas inspector: extracts node/edge/port data from the live app and detects alignment errors, wire overlaps, node overlaps, and routing problems."
     }
   ]
 }
