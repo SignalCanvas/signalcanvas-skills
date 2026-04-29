@@ -11,7 +11,7 @@ description: >
 
 # PatchLang v0.2.8
 
-You are writing **PatchLang v0.2.5**. The language describes broadcast/AV signal flow:
+You are writing **PatchLang v0.2.8**. The language describes broadcast/AV signal flow:
 templates define device types, instances are physical devices, and connections are cables.
 
 When you need annotated examples (Dante systems, ring networks, slot/cards, composition),
@@ -123,9 +123,10 @@ The old `pl_TemplateName_PortName` underscore format is legacy — do not genera
 
 **10. Keywords cannot be template/instance/port names.**
 `template`, `instance`, `is`, `connect`, `bridge`, `bridge_group`, `link_group`,
-`signal`, `flag`, `stream`, `config`, `ports`, `meta`, `in`, `out`, `io`, `ring`, `member`
+`signal`, `flag`, `stream`, `config`, `ports`, `meta`, `in`, `out`, `io`, `ring`, `member`,
+`use`, `slot`, `routing`, `route`, `bus`, `label`
 are all reserved. `card` and `auto` (outside brackets) are valid identifiers.
-`for`, `over`, `generate` are reserved for future parametric generation — no grammar exists yet.
+`for`, `over`, `generate` are reserved but have no grammar yet — do not use them.
 
 **11. Template naming is required (not advisory) in shared libraries.**
 Model numbers and manufacturer-prefixed names: `CL5`, `Rio3224`, `Neutrik_Patch_Bay`. Generic
@@ -217,9 +218,9 @@ instance FOH_Console is CL5(mic_count: 48) @version(">=4.0") {
 
 ```
 connect Instance_A.Port_Out[1..4] -> Instance_B.Port_In[1..4] {
+  @suppress(logical)            # optional: must be FIRST inside the body
   cable: "Cable_Label"
   length: "30m"
-  @suppress(logical)            # optional: suppress specific DRC layers
   mapping: "1:1"                # optional: channel mapping (see below)
 }
 ```
@@ -458,3 +459,100 @@ When given a hardware spec sheet, follow this order:
 
 7. **Write connections** — one `connect` per direction per cable.
    Bidirectional cables always get two connects with matching `cable:` metadata.
+
+---
+
+## Determining Bridge vs Route from Datasheets
+
+When extracting templates from hardware datasheets, the critical decision is: **which signal paths are manufacturer-hardwired, and which are operator-configurable?**
+
+### Decision tree
+
+```
+Question: Can an operator change this signal path without opening the device?
+
+├─ No (hardwired by manufacturer)
+│  └─ Use bridge in template: bridge Source_Port -> Dest_Port
+│
+└─ Yes (configurable via software, menu, or patch bay)
+   └─ No bridge in template
+      └─ Document via route in instance: route Source_Port -> Dest_Port
+```
+
+### Device category patterns
+
+**Stageboxes** (Rio1608, Digico SD-Rack, AVID)
+- Microphone preamps are manufacturer-hardwired to Dante output
+- Include: `bridge Mic_In[1..N] -> Dante_Pri_Out[1..N]`
+- Line outputs are usually hardwired to Dante input
+- Include: `bridge Dante_Pri_In[1..N] -> Line_Out[1..N]`
+
+**Consoles** (CL5, Venue, SD9, PM5D)
+- No manufacturer-hardwired signal paths; all routing is software-configurable
+- Omit bridges entirely
+- Document actual routing per-instance with `route` statements
+
+**Converters** (R08D, Dante AVIO, SDI converters)
+- **Fixed routing** (one input always maps to one output): Use bridge
+  - Example: "Dante Channel 1 always converts to XLR Output 1"
+  - Include: `bridge Dante_Pri_In[1..N] -> XLR_Out[1..N]`
+- **Assignable routing** (operator configures channel mapping): No bridge
+  - Example: "Dante channels can be assigned to any XLR output via menu"
+  - Omit bridge; document in instance if needed
+
+**Routers** (AVB matrix, DANTE domain manager, SDI router)
+- All signal paths are operator-configurable
+- Omit bridges; instance routing depends on specific configuration
+
+**Passive devices** (snakes, looms, patch bays)
+- No active signal processing
+- Omit bridges (they're just wiring)
+
+### Red flags for hardwired paths in datasheets
+
+Look for these phrases:
+
+| Phrase | Hardwired? | Example |
+|--------|------------|---------|
+| "Mic inputs automatically convert to Dante" | YES | Rio3224: "Auto-convert to Dante" |
+| "Fixed 1:1 routing: input [N] maps to output [N]" | YES | Fixed-format converter |
+| "Configurable channel assignment" | NO | "Assign any Dante ch to any XLR out" |
+| "DSP matrix", "assignable crosspoints" | NO | Console internal routing |
+| "Software-configurable mapping" | NO | Operator menu controls routing |
+| "User-definable patches" | NO | Patch bay software |
+
+### When uncertain
+
+If the datasheet is ambiguous or doesn't explicitly describe signal routing:
+
+1. **Start with no bridges** (safer — assumes configurable routing)
+2. **Add them only if evidence appears** in the datasheet describing fixed 1:1 paths
+3. **Defer to operator knowledge** — if available, ask whether the device allows remapping
+
+### Example: Yamaha R08D
+
+Datasheet says: "8-channel Dante to XLR converter"
+
+Without explicit mention of configurable routing, the safe approach is:
+
+```patchlang
+template R08D {
+  meta {
+    manufacturer: "Yamaha"
+    model: "R08D"
+    category: "Converter"
+  }
+  ports {
+    Dante_Pri_In[1..8]:  in(etherCON) [Dante, primary]
+    Dante_Pri_Out[1..8]: out(etherCON) [Dante, primary]
+    XLR_Out[1..8]: out(XLR) [Analogue]
+  }
+  # Omit bridge — if R08D has fixed routing, add bridge based on deeper spec
+}
+```
+
+If deeper research reveals: "Dante channels 1–8 always convert to XLR outputs 1–8 (not user-configurable)," then add:
+
+```patchlang
+bridge Dante_Pri_In[1..8] -> XLR_Out[1..8]
+```
