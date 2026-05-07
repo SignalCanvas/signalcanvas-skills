@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Gracefully skip if jq is missing
+if ! command -v jq >/dev/null 2>&1; then
+    exit 0
+fi
+
+SESSION_ID=$(jq -r '.session_id // empty')
+if [ -z "$SESSION_ID" ]; then
+    exit 0
+fi
+
+SHORT_ID="${SESSION_ID:0:8}"
+DATE=$(date +%Y-%m-%d)
+SESSION_FILE="claude-sessions/${DATE}_${SHORT_ID}.md"
+INDEX_FILE="$PWD/claude-sessions/INDEX.md"
+SKILL_MD="${CLAUDE_PLUGIN_ROOT:-${CURSOR_PLUGIN_ROOT:-}}/skills/session-logger/SKILL.md"
+
+# Read last 10 lines of INDEX.md, cap at ~2000 words
+INDEX_CONTENT="(no history yet)"
+if [ -f "$INDEX_FILE" ]; then
+    INDEX_RAW=$(tail -n 10 "$INDEX_FILE" 2>/dev/null || true)
+    if [ -n "$INDEX_RAW" ]; then
+        INDEX_WORDS=$(echo "$INDEX_RAW" | wc -w | tr -d ' ')
+        if [ "$INDEX_WORDS" -gt 2000 ]; then
+            INDEX_CONTENT=$(echo "$INDEX_RAW" | awk '{words+=NF} words<=2000')
+        else
+            INDEX_CONTENT="$INDEX_RAW"
+        fi
+    fi
+fi
+
+# Most recent per-session detail file (by mtime, excluding current session)
+RECENT_SESSION="(no previous session detail)"
+if [ -d "$PWD/claude-sessions" ]; then
+    mapfile -t session_files < <(find "$PWD/claude-sessions" -maxdepth 1 -name '*.md' ! -name "${DATE}_${SHORT_ID}.md" -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null || true)
+    if [ "${#session_files[@]}" -gt 0 ] && [ -f "${session_files[0]}" ]; then
+        RECENT_SESSION=$(cat "${session_files[0]}")
+    fi
+fi
+
+# Read SKILL.md
+SKILL_CONTENT=""
+if [ -f "$SKILL_MD" ]; then
+    SKILL_CONTENT=$(cat "$SKILL_MD")
+fi
+
+escape_for_json() {
+    local str="$1"
+    str="${str//\\/\\\\}"
+    str="${str//\"/\\\"}"
+    str="${str//$'\n'/\\n}"
+    str="${str//$'\r'/\\r}"
+    str="${str//$'\t'/\\t}"
+    printf '%s' "$str"
+}
+
+CONTEXT="## Session Logger Context\n\n**Session ID:** ${SHORT_ID}\n**Session file:** ${SESSION_FILE}\n\n### Recent INDEX entries (last 10):\n${INDEX_CONTENT}\n\n### Most recent session detail:\n${RECENT_SESSION}\n\n---\n${SKILL_CONTENT}"
+
+ESCAPED=$(escape_for_json "$CONTEXT")
+
+# Platform detection (mirrors superpowers pattern)
+if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
+    printf '{"additional_context": "%s"}\n' "$ESCAPED"
+elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -z "${COPILOT_CLI:-}" ]; then
+    printf '{"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "%s"}}\n' "$ESCAPED"
+else
+    printf '{"additionalContext": "%s"}\n' "$ESCAPED"
+fi

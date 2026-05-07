@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Gracefully skip if jq is missing
+if ! command -v jq >/dev/null 2>&1; then
+    exit 0
+fi
+
+SESSION_ID=$(jq -r '.session_id // empty')
+if [ -z "$SESSION_ID" ]; then
+    exit 0
+fi
+
+SHORT_ID="${SESSION_ID:0:8}"
+DATE=$(date +%Y-%m-%d)
+SESSION_FILE="$PWD/claude-sessions/${DATE}_${SHORT_ID}.md"
+INDEX_FILE="$PWD/claude-sessions/INDEX.md"
+TURN_FILE="/tmp/claude-session-${SHORT_ID}-turn"
+
+# Turn tracking
+TURN=1
+if [ -f "$TURN_FILE" ]; then
+    TURN=$(cat "$TURN_FILE")
+    TURN=$((TURN + 1))
+fi
+printf '%d' "$TURN" > "$TURN_FILE"
+
+# Nudge logic
+NUDGE=""
+if [ "$TURN" -ge 3 ]; then
+    if [ -f "$SESSION_FILE" ] && [ "$(stat -f%z "$SESSION_FILE" 2>/dev/null || stat -c%s "$SESSION_FILE" 2>/dev/null || echo 0)" -gt 50 ]; then
+        NUDGE="If something meaningful happened in your last response, add an entry to your session log."
+    else
+        NUDGE="You have not logged anything this session yet. Before answering, write an entry to your session log."
+    fi
+fi
+
+escape_for_json() {
+    local str="$1"
+    str="${str//\\/\\\\}"
+    str="${str//\"/\\\"}"
+    str="${str//$'\n'/\\n}"
+    str="${str//$'\r'/\\r}"
+    str="${str//$'\t'/\\t}"
+    printf '%s' "$str"
+}
+
+CONTEXT="## Session Logger\n\n**Your session file:** ${SESSION_FILE}  \n**Index file:** ${INDEX_FILE}  \n**Session ID:** ${SHORT_ID}\n\n${NUDGE}"
+
+ESCAPED=$(escape_for_json "$CONTEXT")
+
+# Platform detection (mirrors superpowers pattern)
+if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
+    printf '{"additional_context": "%s"}\n' "$ESCAPED"
+else
+    printf '{"additionalContext": "%s"}\n' "$ESCAPED"
+fi

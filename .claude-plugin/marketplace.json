@@ -32,6 +32,11 @@
       "name": "canvas-audit",
       "source": "./plugins/canvas-audit",
       "description": "Playwright VueFlow canvas inspector: extracts node/edge/port data from the live app and detects alignment errors, wire overlaps, node overlaps, and routing problems."
+    },
+    {
+      "name": "session-logger",
+      "source": "./plugins/session-logger",
+      "description": "Per-project Claude Code session log. Injects recent history at session start and nudges Claude to write entries after meaningful work."
     }
   ]
 }
