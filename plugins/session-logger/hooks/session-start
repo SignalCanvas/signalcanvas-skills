@@ -34,9 +34,9 @@ fi
 # Most recent per-session detail file (by mtime, excluding current session)
 RECENT_SESSION="(no previous session detail)"
 if [ -d "$PWD/claude-sessions" ]; then
-    mapfile -t session_files < <(find "$PWD/claude-sessions" -maxdepth 1 -name '*.md' ! -name "${DATE}_${SHORT_ID}.md" -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null || true)
-    if [ "${#session_files[@]}" -gt 0 ] && [ -f "${session_files[0]}" ]; then
-        RECENT_SESSION=$(cat "${session_files[0]}")
+    most_recent=$(find "$PWD/claude-sessions" -maxdepth 1 -name '*.md' ! -name "${DATE}_${SHORT_ID}.md" -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -1 || true)
+    if [ -n "$most_recent" ] && [ -f "$most_recent" ]; then
+        RECENT_SESSION=$(cat "$most_recent")
     fi
 fi
 
