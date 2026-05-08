@@ -1,16 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Debug log
-echo "[$(date)] session-stop invoked, PWD=$PWD" >> /tmp/session-stop-debug.log
-
 if ! command -v jq >/dev/null 2>&1; then
-    echo "[$(date)] jq missing" >> /tmp/session-stop-debug.log
     exit 0
 fi
 
 HOOK_INPUT=$(cat)
-echo "[$(date)] input: $HOOK_INPUT" >> /tmp/session-stop-debug.log
 
 # Prevent infinite loops
 STOP_HOOK_ACTIVE=$(echo "$HOOK_INPUT" | jq -r '.stop_hook_active // false')
@@ -25,8 +20,17 @@ fi
 
 SHORT_ID="${SESSION_ID:0:8}"
 DATE=$(date +%Y-%m-%d)
-SESSION_FILE="$PWD/claude-sessions/${DATE}_${SHORT_ID}.md"
-INDEX_FILE="$PWD/claude-sessions/INDEX.md"
+
+# Use project root saved by session-start (PWD at stop time is unreliable)
+ROOT_FILE="/tmp/claude-session-${SHORT_ID}-root"
+if [ -f "$ROOT_FILE" ]; then
+    PROJECT_ROOT=$(cat "$ROOT_FILE")
+else
+    PROJECT_ROOT="$PWD"
+fi
+
+SESSION_FILE="${PROJECT_ROOT}/claude-sessions/${DATE}_${SHORT_ID}.md"
+INDEX_FILE="${PROJECT_ROOT}/claude-sessions/INDEX.md"
 TURN_FILE="/tmp/claude-session-${SHORT_ID}-turn"
 LOGGED_TURN_FILE="/tmp/claude-session-${SHORT_ID}-logged-turn"
 

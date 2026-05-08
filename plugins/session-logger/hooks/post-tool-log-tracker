@@ -26,6 +26,15 @@ if [[ "$FILE_PATH" != *"claude-sessions/"* ]]; then
     exit 0
 fi
 
+# Verify it's in the correct project root (not a different repo's claude-sessions)
+ROOT_FILE="/tmp/claude-session-${SHORT_ID}-root"
+if [ -f "$ROOT_FILE" ]; then
+    PROJECT_ROOT=$(cat "$ROOT_FILE")
+    if [[ "$FILE_PATH" != "${PROJECT_ROOT}"* ]]; then
+        exit 0
+    fi
+fi
+
 # Record the turn number at which the log was last written
 TURN_FILE="/tmp/claude-session-${SHORT_ID}-turn"
 LOGGED_TURN_FILE="/tmp/claude-session-${SHORT_ID}-logged-turn"

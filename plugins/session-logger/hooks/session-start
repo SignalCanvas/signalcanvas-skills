@@ -14,6 +14,9 @@ fi
 SHORT_ID="${SESSION_ID:0:8}"
 DATE=$(date +%Y-%m-%d)
 SESSION_FILE="claude-sessions/${DATE}_${SHORT_ID}.md"
+
+# Save project root so other hooks (stop, post-tool) can find the right directory
+echo "$PWD" > "/tmp/claude-session-${SHORT_ID}-root"
 INDEX_FILE="$PWD/claude-sessions/INDEX.md"
 SKILL_MD="${CLAUDE_PLUGIN_ROOT:-${CURSOR_PLUGIN_ROOT:-}}/skills/session-logger/SKILL.md"
 
