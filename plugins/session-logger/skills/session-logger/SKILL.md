@@ -1,18 +1,16 @@
-## Session Logger
+## SESSION LOG — REQUIRED
 
-Your session file: `claude-sessions/YYYY-MM-DD_SESSION_ID.md`  
-Index file: `claude-sessions/INDEX.md`
+You MUST write to your session log. This is how you maintain memory across sessions. Future Claude instances depend on this to understand what happened and continue the work. Skipping it breaks continuity.
 
-**When to write:** When something meaningful happened — a decision was made, code was written, a task completed, a bug fixed. Skip pure back-and-forth discussion. When in doubt, write.
+**When:** After any response where something meaningful happened — a decision, code written, bug fixed, direction set. When in doubt, write.
 
 **What to write:**
-1. A short paragraph in your session file (write this FIRST)
+1. A paragraph in your session file (write this FIRST): the *why* and *what was decided*, not a tool call log
 2. One line in INDEX.md: `[YYYY-MM-DD HH:MM] [SESSION_ID] Brief summary → session-file.md`
 
-**Style:** Write the *why* and *what was decided*. Not a tool call log. A future Claude should be able to read this and continue the work.
+**Style:** Write so a future Claude can pick up the work cold. What was decided and why. What's pending.
 
-**Atomic append for INDEX.md:**  
-First run `mkdir -p claude-sessions`, then use:
+**Atomic append for INDEX.md:**
 ```bash
 python3 -c "
 import os

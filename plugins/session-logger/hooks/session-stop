@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Debug log
+echo "[$(date)] session-stop invoked, PWD=$PWD" >> /tmp/session-stop-debug.log
+
+if ! command -v jq >/dev/null 2>&1; then
+    echo "[$(date)] jq missing" >> /tmp/session-stop-debug.log
+    exit 0
+fi
+
+HOOK_INPUT=$(cat)
+echo "[$(date)] input: $HOOK_INPUT" >> /tmp/session-stop-debug.log
+
+# Prevent infinite loops
+STOP_HOOK_ACTIVE=$(echo "$HOOK_INPUT" | jq -r '.stop_hook_active // false')
+if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
+    exit 0
+fi
+
+SESSION_ID=$(echo "$HOOK_INPUT" | jq -r '.session_id // empty')
+if [ -z "$SESSION_ID" ]; then
+    exit 0
+fi
+
+SHORT_ID="${SESSION_ID:0:8}"
+DATE=$(date +%Y-%m-%d)
+SESSION_FILE="$PWD/claude-sessions/${DATE}_${SHORT_ID}.md"
+INDEX_FILE="$PWD/claude-sessions/INDEX.md"
+TURN_FILE="/tmp/claude-session-${SHORT_ID}-turn"
+LOGGED_TURN_FILE="/tmp/claude-session-${SHORT_ID}-logged-turn"
+
+# Only enforce after turn 3
+TURN=0
+if [ -f "$TURN_FILE" ]; then
+    TURN=$(cat "$TURN_FILE" 2>/dev/null || echo 0)
+fi
+if [ "$TURN" -lt 3 ]; then
+    exit 0
+fi
+
+# Get the turn when the log was last written (0 = never)
+LAST_LOGGED=0
+if [ -f "$LOGGED_TURN_FILE" ]; then
+    LAST_LOGGED=$(cat "$LOGGED_TURN_FILE" 2>/dev/null || echo 0)
+fi
+
+TURNS_SINCE_LOG=$((TURN - LAST_LOGGED))
+STALE_THRESHOLD=5
+
+if [ "$TURNS_SINCE_LOG" -lt "$STALE_THRESHOLD" ]; then
+    exit 0
+fi
+
+# Log is stale - block and require update
+if [ "$LAST_LOGGED" -eq 0 ]; then
+    STALENESS_MSG="You have never written a session log this session ($TURN turns in)."
+else
+    STALENESS_MSG="You last wrote the session log $TURNS_SINCE_LOG turns ago (turn $LAST_LOGGED of $TURN)."
+fi
+
+REASON="STOP BLOCKED: Session log not updated.\n\n${STALENESS_MSG}\n\nWrite a paragraph to: ${SESSION_FILE}\nAppend one line to: ${INDEX_FILE}\n   Format: [${DATE} HH:MM] [${SHORT_ID}] Brief summary → ${DATE}_${SHORT_ID}.md\n\nDocument what was decided and accomplished. Write for a future Claude who needs to pick up this work cold. Do it now, then you may stop."
+
+escape_for_json() {
+    local str="$1"
+    str="${str//\\/\\\\}"
+    str="${str//\"/\\\"}"
+    str="${str//$'\n'/\\n}"
+    str="${str//$'\r'/\\r}"
+    str="${str//$'\t'/\\t}"
+    printf '%s' "$str"
+}
+
+ESCAPED=$(escape_for_json "$REASON")
+printf '{"decision": "block", "reason": "%s"}\n' "$ESCAPED"

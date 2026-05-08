@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v jq >/dev/null 2>&1; then
+    exit 0
+fi
+
+HOOK_INPUT=$(cat)
+
+SESSION_ID=$(echo "$HOOK_INPUT" | jq -r '.session_id // empty')
+if [ -z "$SESSION_ID" ]; then
+    exit 0
+fi
+
+SHORT_ID="${SESSION_ID:0:8}"
+
+# Only care about Write or Edit tool calls
+TOOL_NAME=$(echo "$HOOK_INPUT" | jq -r '.tool_name // empty')
+if [ "$TOOL_NAME" != "Write" ] && [ "$TOOL_NAME" != "Edit" ]; then
+    exit 0
+fi
+
+# Only care about writes to claude-sessions/
+FILE_PATH=$(echo "$HOOK_INPUT" | jq -r '.tool_input.file_path // empty')
+if [[ "$FILE_PATH" != *"claude-sessions/"* ]]; then
+    exit 0
+fi
+
+# Record the turn number at which the log was last written
+TURN_FILE="/tmp/claude-session-${SHORT_ID}-turn"
+LOGGED_TURN_FILE="/tmp/claude-session-${SHORT_ID}-logged-turn"
+
+TURN=0
+if [ -f "$TURN_FILE" ]; then
+    TURN=$(cat "$TURN_FILE" 2>/dev/null || echo 0)
+fi
+
+printf '%d' "$TURN" > "$LOGGED_TURN_FILE"
