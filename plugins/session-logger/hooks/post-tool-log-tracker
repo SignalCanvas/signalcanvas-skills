@@ -32,8 +32,9 @@ else
 fi
 
 # Verify it's in the correct project root (not a different repo's claude-sessions)
+# FILE_PATH is only set for Write/Edit; for Bash we skip the root check
 ROOT_FILE="/tmp/claude-session-${SHORT_ID}-root"
-if [ -f "$ROOT_FILE" ]; then
+if [ -f "$ROOT_FILE" ] && [ -n "${FILE_PATH:-}" ]; then
     PROJECT_ROOT=$(cat "$ROOT_FILE")
     if [[ "$FILE_PATH" != "${PROJECT_ROOT}"* ]]; then
         exit 0
