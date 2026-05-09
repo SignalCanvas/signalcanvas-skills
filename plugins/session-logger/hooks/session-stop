@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Set DEBUG=1 to enable diagnostic output to /tmp/session-stop-debug.log
+DEBUG=1
+LOG=/tmp/session-stop-debug.log
+dbg() { [ "$DEBUG" -eq 1 ] && echo "[$(date +%H:%M:%S)] $*" >> "$LOG" || true; }
+
 if ! command -v jq >/dev/null 2>&1; then
+    dbg "ERROR: jq not found"
     exit 0
 fi
 
@@ -10,16 +16,21 @@ HOOK_INPUT=$(cat)
 # Prevent infinite loops
 STOP_HOOK_ACTIVE=$(echo "$HOOK_INPUT" | jq -r '.stop_hook_active // false')
 if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
+    dbg "stop_hook_active=true, skipping"
     exit 0
 fi
 
 SESSION_ID=$(echo "$HOOK_INPUT" | jq -r '.session_id // empty')
 if [ -z "$SESSION_ID" ]; then
+    dbg "no session_id, skipping"
     exit 0
 fi
 
 SHORT_ID="${SESSION_ID:0:8}"
 DATE=$(date +%Y-%m-%d)
+TRANSCRIPT_PATH=$(echo "$HOOK_INPUT" | jq -r '.transcript_path // empty')
+
+dbg "--- session=$SHORT_ID transcript=$TRANSCRIPT_PATH"
 
 # Use project root saved by session-start (PWD at stop time is unreliable)
 ROOT_FILE="/tmp/claude-session-${SHORT_ID}-root"
@@ -27,6 +38,7 @@ if [ -f "$ROOT_FILE" ]; then
     PROJECT_ROOT=$(cat "$ROOT_FILE")
 else
     PROJECT_ROOT="$PWD"
+    dbg "WARNING: root file missing, falling back to PWD=$PWD"
 fi
 
 SESSION_FILE="${PROJECT_ROOT}/claude-sessions/${DATE}_${SHORT_ID}.md"
@@ -40,6 +52,7 @@ if [ -f "$TURN_FILE" ]; then
     TURN=$(cat "$TURN_FILE" 2>/dev/null || echo 0)
 fi
 if [ "$TURN" -lt 3 ]; then
+    dbg "turn=$TURN < 3, skipping"
     exit 0
 fi
 
@@ -50,20 +63,41 @@ if [ -f "$LOGGED_TURN_FILE" ]; then
 fi
 
 TURNS_SINCE_LOG=$((TURN - LAST_LOGGED))
-STALE_THRESHOLD=15
+TURN_THRESHOLD=8
 
-if [ "$TURNS_SINCE_LOG" -lt "$STALE_THRESHOLD" ]; then
+# Check context window usage from transcript
+INPUT_TOKENS=0
+if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
+    INPUT_TOKENS=$(grep '"role":"assistant"' "$TRANSCRIPT_PATH" 2>/dev/null | tail -1 | jq -r '.message.usage.input_tokens // 0' 2>/dev/null || echo 0)
+fi
+TOKEN_THRESHOLD=150000  # 75% of 200K context window
+
+dbg "turn=$TURN last_logged=$LAST_LOGGED turns_since=$TURNS_SINCE_LOG (threshold=$TURN_THRESHOLD) tokens=$INPUT_TOKENS (threshold=$TOKEN_THRESHOLD)"
+
+# Trigger if turn gap exceeded OR context window approaching full
+TRIGGER_REASON=""
+if [ "$TURNS_SINCE_LOG" -ge "$TURN_THRESHOLD" ]; then
+    TRIGGER_REASON="turn gap ($TURNS_SINCE_LOG turns since last log)"
+fi
+if [ "$INPUT_TOKENS" -gt "$TOKEN_THRESHOLD" ]; then
+    TRIGGER_REASON="context window at ${INPUT_TOKENS} tokens (threshold ${TOKEN_THRESHOLD})"
+fi
+
+if [ -z "$TRIGGER_REASON" ]; then
+    dbg "no trigger, allowing stop"
     exit 0
 fi
 
-# Log is stale - block and require update
+dbg "BLOCKING: $TRIGGER_REASON"
+
+# Build the staleness message
 if [ "$LAST_LOGGED" -eq 0 ]; then
-    STALENESS_MSG="You have never written a session log this session ($TURN turns in)."
+    STALENESS_MSG="You have never written a session log this session ($TURN turns in, ${INPUT_TOKENS} input tokens)."
 else
-    STALENESS_MSG="You last wrote the session log $TURNS_SINCE_LOG turns ago (turn $LAST_LOGGED of $TURN)."
+    STALENESS_MSG="You last wrote the session log $TURNS_SINCE_LOG turns ago (turn $LAST_LOGGED of $TURN, ${INPUT_TOKENS} input tokens)."
 fi
 
-REASON="STOP BLOCKED: Session log not updated.\n\n${STALENESS_MSG}\n\nWrite a paragraph to: ${SESSION_FILE}\nAppend one line to: ${INDEX_FILE}\n   Format: [${DATE} HH:MM] [${SHORT_ID}] Brief summary → ${DATE}_${SHORT_ID}.md\n\nDocument what was decided and accomplished. Write for a future Claude who needs to pick up this work cold. Write the log entry now using the Write tool, then continue the conversation normally."
+REASON="STOP BLOCKED: Session log not updated.\n\n${STALENESS_MSG}\nTrigger: ${TRIGGER_REASON}.\n\nWrite a paragraph to: ${SESSION_FILE}\nAppend one line to: ${INDEX_FILE}\n   Format: [${DATE} HH:MM] [${SHORT_ID}] Brief summary → ${DATE}_${SHORT_ID}.md\n\nDocument what was decided and accomplished. Write for a future Claude who needs to pick up this work cold. Write the log entry now using the Write tool, then continue the conversation normally."
 
 escape_for_json() {
     local str="$1"
