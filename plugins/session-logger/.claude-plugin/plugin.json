@@ -1,5 +1,5 @@
 {
   "name": "session-logger",
   "description": "Automatically logs Claude Code session activity per project. Injects recent history into new sessions so you never re-explain context.",
-  "version": "1.0.12"
+  "version": "1.0.13"
 }

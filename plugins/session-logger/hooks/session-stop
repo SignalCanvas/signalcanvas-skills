@@ -66,11 +66,17 @@ TURNS_SINCE_LOG=$((TURN - LAST_LOGGED))
 TURN_THRESHOLD=8
 
 # Check context window usage from transcript
+# Transcript uses "type":"assistant" (not "role"). Tokens are split across
+# input_tokens + cache_read_input_tokens + cache_creation_input_tokens.
 INPUT_TOKENS=0
 if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
-    INPUT_TOKENS=$(grep '"role":"assistant"' "$TRANSCRIPT_PATH" 2>/dev/null | tail -1 | jq -r '.message.usage.input_tokens // 0' 2>/dev/null || echo 0)
+    INPUT_TOKENS=$(grep '"type":"assistant"' "$TRANSCRIPT_PATH" 2>/dev/null | tail -1 | jq -r '
+        (.message.usage.input_tokens // 0) +
+        (.message.usage.cache_read_input_tokens // 0) +
+        (.message.usage.cache_creation_input_tokens // 0)
+    ' 2>/dev/null || echo 0)
 fi
-TOKEN_THRESHOLD=150000  # 75% of 200K context window
+TOKEN_THRESHOLD=400000  # ~67% of 600K context window (autocompact at ~567K)
 
 dbg "turn=$TURN last_logged=$LAST_LOGGED turns_since=$TURNS_SINCE_LOG (threshold=$TURN_THRESHOLD) tokens=$INPUT_TOKENS (threshold=$TOKEN_THRESHOLD)"
 
