@@ -15,8 +15,10 @@ SHORT_ID="${SESSION_ID:0:8}"
 DATE=$(date +%Y-%m-%d)
 SESSION_FILE="claude-sessions/${DATE}_${SHORT_ID}.md"
 
-# Save project root so other hooks (stop, post-tool) can find the right directory
-echo "$PWD" > "/tmp/claude-session-${SHORT_ID}-root"
+# Save repo root so other hooks (stop, post-tool) can find the right directory.
+# Use git root if available so monorepo subdirectory opens don't scatter logs.
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")
+echo "$REPO_ROOT" > "/tmp/claude-session-${SHORT_ID}-root"
 
 # Write the how-to-log instructions file once per project
 mkdir -p "$PWD/claude-sessions"
