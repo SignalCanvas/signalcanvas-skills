@@ -14,15 +14,20 @@ fi
 
 SHORT_ID="${SESSION_ID:0:8}"
 
-# Only care about Write or Edit tool calls
+# Detect writes to claude-sessions/ via Write, Edit, or Bash
 TOOL_NAME=$(echo "$HOOK_INPUT" | jq -r '.tool_name // empty')
-if [ "$TOOL_NAME" != "Write" ] && [ "$TOOL_NAME" != "Edit" ]; then
-    exit 0
-fi
 
-# Only care about writes to claude-sessions/
-FILE_PATH=$(echo "$HOOK_INPUT" | jq -r '.tool_input.file_path // empty')
-if [[ "$FILE_PATH" != *"claude-sessions/"* ]]; then
+if [ "$TOOL_NAME" = "Write" ] || [ "$TOOL_NAME" = "Edit" ]; then
+    FILE_PATH=$(echo "$HOOK_INPUT" | jq -r '.tool_input.file_path // empty')
+    if [[ "$FILE_PATH" != *"claude-sessions/"* ]]; then
+        exit 0
+    fi
+elif [ "$TOOL_NAME" = "Bash" ]; then
+    COMMAND=$(echo "$HOOK_INPUT" | jq -r '.tool_input.command // empty')
+    if [[ "$COMMAND" != *"claude-sessions/"* ]]; then
+        exit 0
+    fi
+else
     exit 0
 fi
 
