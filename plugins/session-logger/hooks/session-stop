@@ -103,7 +103,9 @@ else
     STALENESS_MSG="You last wrote the session log $TURNS_SINCE_LOG turns ago (turn $LAST_LOGGED of $TURN, ${INPUT_TOKENS} input tokens)."
 fi
 
-REASON="STOP BLOCKED: Session log not updated.\n\n${STALENESS_MSG}\nTrigger: ${TRIGGER_REASON}.\n\nWrite a paragraph to: ${SESSION_FILE}\nAppend one line to: ${INDEX_FILE}\n   Format: [${DATE} HH:MM] [${SHORT_ID}] Brief summary → ${DATE}_${SHORT_ID}.md\n\nDocument what was decided and accomplished. Write for a future Claude who needs to pick up this work cold. Write the log entry now using the Write tool, then continue the conversation normally."
+PURPLE=$'\033[35;5m'
+RESET=$'\033[0m'
+REASON="${PURPLE}📝 SESSION LOG REQUIRED${RESET} — ${STALENESS_MSG} Write to: ${SESSION_FILE} — read ${PROJECT_ROOT}/claude-sessions/HOW-TO-LOG.md for instructions."
 
 escape_for_json() {
     local str="$1"
