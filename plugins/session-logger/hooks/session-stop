@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Set DEBUG=1 to enable diagnostic output to /tmp/session-stop-debug.log
-DEBUG=1
+# Set SESSION_LOGGER_DEBUG=1 in ~/.claude/settings.json env block to enable
+DEBUG=${SESSION_LOGGER_DEBUG:-0}
 LOG=/tmp/session-stop-debug.log
 dbg() { [ "$DEBUG" -eq 1 ] && echo "[$(date +%H:%M:%S)] $*" >> "$LOG" || true; }
 
