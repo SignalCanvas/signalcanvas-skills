@@ -63,7 +63,7 @@ if [ -f "$LOGGED_TURN_FILE" ]; then
 fi
 
 TURNS_SINCE_LOG=$((TURN - LAST_LOGGED))
-TURN_THRESHOLD=8
+TURN_THRESHOLD=5
 
 # Check context window usage from transcript
 # Transcript uses "type":"assistant" (not "role"). Tokens are split across
