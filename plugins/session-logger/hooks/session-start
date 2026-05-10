@@ -21,8 +21,8 @@ REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")
 echo "$REPO_ROOT" > "/tmp/claude-session-${SHORT_ID}-root"
 
 # Write the how-to-log instructions file once per project
-mkdir -p "$PWD/claude-sessions"
-HOW_TO="$PWD/claude-sessions/HOW-TO-LOG.md"
+mkdir -p "$REPO_ROOT/claude-sessions"
+HOW_TO="$REPO_ROOT/claude-sessions/HOW-TO-LOG.md"
 if [ ! -f "$HOW_TO" ]; then
 cat > "$HOW_TO" << 'HOWTO'
 # How to write a session log entry
@@ -51,7 +51,7 @@ After writing both files, continue the conversation normally. Do not announce th
 wrote the log — just continue.
 HOWTO
 fi
-INDEX_FILE="$PWD/claude-sessions/INDEX.md"
+INDEX_FILE="$REPO_ROOT/claude-sessions/INDEX.md"
 SKILL_MD="${CLAUDE_PLUGIN_ROOT:-${CURSOR_PLUGIN_ROOT:-}}/skills/session-logger/SKILL.md"
 
 # Read last 10 lines of INDEX.md, cap at ~2000 words
@@ -70,8 +70,8 @@ fi
 
 # Most recent per-session detail file (by mtime, excluding current session)
 RECENT_SESSION="(no previous session detail)"
-if [ -d "$PWD/claude-sessions" ]; then
-    most_recent=$(find "$PWD/claude-sessions" -maxdepth 1 -name '*.md' ! -name "${DATE}_${SHORT_ID}.md" -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -1 || true)
+if [ -d "$REPO_ROOT/claude-sessions" ]; then
+    most_recent=$(find "$REPO_ROOT/claude-sessions" -maxdepth 1 -name '*.md' ! -name "${DATE}_${SHORT_ID}.md" -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -1 || true)
     if [ -n "$most_recent" ] && [ -f "$most_recent" ]; then
         RECENT_SESSION=$(cat "$most_recent")
     fi
