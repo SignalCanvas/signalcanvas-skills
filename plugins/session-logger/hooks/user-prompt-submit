@@ -13,9 +13,19 @@ fi
 
 SHORT_ID="${SESSION_ID:0:8}"
 DATE=$(date +%Y-%m-%d)
-SESSION_FILE="$PWD/claude-sessions/${DATE}_${SHORT_ID}.md"
-INDEX_FILE="$PWD/claude-sessions/INDEX.md"
+
+# Use project root saved by session-start ($PWD at prompt time is unreliable)
+ROOT_FILE="/tmp/claude-session-${SHORT_ID}-root"
+if [ -f "$ROOT_FILE" ]; then
+    PROJECT_ROOT=$(cat "$ROOT_FILE")
+else
+    PROJECT_ROOT="$PWD"
+fi
+
+SESSION_FILE="${PROJECT_ROOT}/claude-sessions/${DATE}_${SHORT_ID}.md"
+INDEX_FILE="${PROJECT_ROOT}/claude-sessions/INDEX.md"
 TURN_FILE="/tmp/claude-session-${SHORT_ID}-turn"
+LOGGED_TURN_FILE="/tmp/claude-session-${SHORT_ID}-logged-turn"
 
 # Turn tracking
 TURN=1
@@ -25,14 +35,31 @@ if [ -f "$TURN_FILE" ]; then
 fi
 printf '%d' "$TURN" > "$TURN_FILE"
 
-# Nudge logic
+# Nudge logic — only fire when turns since last log write crosses a threshold.
+# Thresholds mirror session-stop (TURN_THRESHOLD=5) but escalate in two stages:
+#   < SOFT_THRESHOLD  → silent (log was recently written)
+#   SOFT..HARD        → soft reminder
+#   >= HARD_THRESHOLD → urgent demand
+SOFT_THRESHOLD=3
+HARD_THRESHOLD=6
+
 NUDGE=""
 if [ "$TURN" -ge 2 ]; then
+    LAST_LOGGED=0
+    if [ -f "$LOGGED_TURN_FILE" ]; then
+        LAST_LOGGED=$(cat "$LOGGED_TURN_FILE" 2>/dev/null || echo 0)
+    fi
+    TURNS_SINCE_LOG=$((TURN - LAST_LOGGED))
+
     FILE_SIZE=$(stat -f%z "$SESSION_FILE" 2>/dev/null || stat -c%s "$SESSION_FILE" 2>/dev/null || echo 0)
-    if [ -f "$SESSION_FILE" ] && [ "$FILE_SIZE" -gt 50 ]; then
-        NUDGE="SESSION LOG: If anything meaningful happened in your last response (decision made, code written, bug fixed, direction set), append a paragraph to ${SESSION_FILE} and add one line to ${INDEX_FILE} NOW — before writing your response. This is not optional."
-    else
+
+    if [ "$LAST_LOGGED" -eq 0 ] && { [ ! -f "$SESSION_FILE" ] || [ "$FILE_SIZE" -le 50 ]; }; then
+        # Never written anything yet
         NUDGE="SESSION LOG REQUIRED: You have not written a session log entry yet. Write a paragraph to ${SESSION_FILE} and one line to ${INDEX_FILE} NOW — before writing your response. This is not optional. Skipping this is a mistake."
+    elif [ "$TURNS_SINCE_LOG" -ge "$HARD_THRESHOLD" ]; then
+        NUDGE="SESSION LOG OVERDUE: You last updated the log ${TURNS_SINCE_LOG} turns ago. Append a paragraph to ${SESSION_FILE} and one line to ${INDEX_FILE} NOW — before writing your response."
+    elif [ "$TURNS_SINCE_LOG" -ge "$SOFT_THRESHOLD" ]; then
+        NUDGE="SESSION LOG: If anything meaningful happened in the last few turns (decision made, code written, bug fixed, direction set), append a paragraph to ${SESSION_FILE} and add one line to ${INDEX_FILE} NOW — before writing your response."
     fi
 fi
 
@@ -49,6 +76,11 @@ escape_for_json() {
 CONTEXT="## SESSION LOG — REQUIRED ACTION\n\n**Session file:** ${SESSION_FILE}\n**Index file:** ${INDEX_FILE}\n**Session ID:** ${SHORT_ID}\n\n${NUDGE}"
 
 ESCAPED=$(escape_for_json "$CONTEXT")
+
+# Only inject context when there's an actual nudge to deliver
+if [ -z "$NUDGE" ]; then
+    exit 0
+fi
 
 # Platform detection (mirrors superpowers pattern)
 if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
