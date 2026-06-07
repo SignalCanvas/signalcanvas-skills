@@ -37,6 +37,11 @@
       "name": "session-logger",
       "source": "./plugins/session-logger",
       "description": "Per-project Claude Code session log. Injects recent history at session start and nudges Claude to write entries after meaningful work."
+    },
+    {
+      "name": "signalcanvas-testing",
+      "source": "./plugins/signalcanvas-testing",
+      "description": "SignalCanvas test automation: /scbt (Playwright browser trace), /scpt (Vitest signal flow), /scft (label scanner)"
     }
   ]
 }

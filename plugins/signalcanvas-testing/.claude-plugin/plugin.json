@@ -1,0 +1,5 @@
+{
+  "name": "signalcanvas-testing",
+  "description": "SignalCanvas test automation: run browser trace tests (Playwright), signal flow tests (Vitest), and label scanning on patch files",
+  "version": "1.0.0"
+}
