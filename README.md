@@ -20,6 +20,17 @@ Claude Code picks up skills from `~/.claude/skills/` automatically.
 | `signalcanvas-builder` | Building or importing a signal flow into SignalCanvas — from conversation, CSV/XLSX patch lists, or screenshots of Visio/handwritten diagrams |
 | `stock-library-builder` | Building, editing, or auditing device templates in the SignalCanvas stock library (`src/data/stdlib/`) |
 
+## Slash Commands
+
+Run any of these from the FrontendV1 repo root.
+
+| Command | Plugin | What it does |
+|---------|--------|--------------|
+| `/scbt` | `signalcanvas-testing` | Run the browser trace integration tests (Playwright) |
+| `/scft` | `signalcanvas-testing` | Run the label scanner on a specific `.patch` file |
+| `/scpt` | `signalcanvas-testing` | Run the signal flow protocol test suite |
+| `/scpkg` | `signalcanvas-packaging` | Cut a new beta release — bumps version, updates changelog/BETA-README, builds the macOS `.pkg` installer |
+
 ## Usage
 
 Invoke a skill explicitly for best results:

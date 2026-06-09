@@ -1,0 +1,5 @@
+{
+  "name": "signalcanvas-packaging",
+  "description": "SignalCanvas release packaging: cuts a new macOS .pkg installer (version bump, changelog, BETA-README, build) via the /scpkg slash command",
+  "version": "1.0.0"
+}
