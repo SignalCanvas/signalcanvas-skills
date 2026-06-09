@@ -94,6 +94,37 @@ The merge matches by: same direction + same protocol set + same channel count. T
 
 Patterns from existing stdlib: `_Pri_`/`_Sec_` (Dante, MADI), `_A`/`_B` (Q-LAN), `_Pri`/`_Sec` (AVB).
 
+### Physical Connectors vs Virtual Channels
+
+**Not every logical channel needs a physical connector port.**
+
+When a device's outputs exist only as virtual channels on a network (Dante, MADI, AES67), and NOT as physical XLR/analog connectors, do NOT model them as separate `out()` ports.
+
+**Bad pattern — phantom ports:**
+```
+# WRONG: Implies 32 physical XLR IEM outputs on the back of the Base Station
+template Spectera_Base_Station {
+  ports {
+    Dante_Out[1..32]: out(RJ45) [Dante]
+    IEM_Out[1..32]: out(XLR) [Analogue]  # ← These don't exist as physical connectors!
+  }
+}
+```
+
+**Correct pattern — virtual channels within the network:**
+```
+# CORRECT: Dante Out is the only physical output. Which channels are IEM
+# vs mics is configured at runtime, not in the template.
+template Spectera_Base_Station {
+  ports {
+    Dante_Pri_Out[1..32]: out(RJ45) [Dante]  # 32 virtual channels, configured per-instance
+    Dante_Sec_Out[1..32]: out(RJ45) [Dante, redundant]
+  }
+}
+```
+
+**Rule of thumb:** If the hardware doesn't have a physical XLR/RJ45/BNC/fiber connector carrying that signal, don't model it as a port. If it's a virtual allocation of existing network capacity (Dante channels), leave that to per-instance configuration.
+
 ### Processors must NOT have bridges
 Consoles and DSPs have user-configurable routing. Don't add `bridge` declarations — routing is configured on the canvas after placement.
 
@@ -187,8 +218,44 @@ template GX4816 {
 
 When a manufacturer publishes a new revision (channel mapping changes, ME mode behavior expands, new firmware adds capabilities), the citation tells the next maintainer exactly which document to re-check.
 
+### MADI is always 64 channels per connection
+Each MADI connection (optical SFP or coax BNC) carries exactly 64 channels. Every MADI port **must** declare `[1..64]` — a bare port with no range is silently treated as 1 channel and will show no `×64` badge on the canvas.
+
+Some devices have two mirrored coax outputs (same 64-channel stream on two BNC connectors). Model these as two separate named ports — not as `[1..2]` which would mean 2 channels total:
+
+```
+# WRONG — 2 channels total, not 2 connectors of 64
+MADI_Coax_Out[1..2]: out(BNC_75) [MADI]
+
+# CORRECT — two mirrored 64-channel outputs
+MADI_Coax_Out_1[1..64]: out(BNC_75) [MADI]
+MADI_Coax_Out_2[1..64]: out(BNC_75) [MADI]
+```
+
+### USB Audio ports require an explicit channel count
+`USB: io(USB) [USB_Audio]` with no range is silently treated as 1 channel. Look up the actual USB audio channel count in the manufacturer's spec (it equals however many channels the device streams to/from a DAW) and declare it explicitly:
+
+```
+# WRONG — no channel count, renders as "USB" with no badge
+USB: io(USB) [USB_Audio]
+
+# CORRECT — 64 channels in both directions
+USB[1..64]: io(USB) [USB_Audio]
+```
+
+The channel count on the USB port is what allows the mapping UI to assign channels when a user wires their computer to the device.
+
 ### AES3 is always 2 channels per connector
 Each AES3 connector (XLR or BNC) carries exactly 2 channels. Port ranges reflect **channels**, not connectors. A device with 2 AES3 XLR outputs has 4 AES3 channels: `AES_Out[1..4]: out(XLR) [AES3]`.
+
+**Switchable analogue/AES3 combo inputs:** Some devices pair XLRs so that two analogue mono inputs share a single AES3 slot. When set to AES3, only the first XLR of each pair is active and carries both channels; the second XLR is unused. The AES3 port's channel count equals the number of *active* connectors (half the total XLRs) × 2 — which equals the same stereo pair count as the analogue mode, not double it.
+
+```
+# Device with 4 XLR combo inputs (2 analogue pairs or 2 AES3 pairs):
+Audio_In[1..4]: in(XLR) [Analogue]   # all 4 XLRs used, 4 mono channels
+AES_In[1..4]: in(XLR) [AES3]         # only XLR 1+3 active, 2 connectors × 2ch = 4 channels
+# NOT AES_In[1..8] — that would imply all 4 XLRs active in AES3 mode, which is wrong
+```
 
 ### Dante vs AES67 tagging
 Tag Dante ports as `[Dante]` only — never `[Dante, AES67]`. AES67 compatibility is a chipset-level feature, not a per-port protocol. Adding `AES67` to the port tag causes the system to treat the port as stream-based, breaking normal Dante channel display.
@@ -211,13 +278,98 @@ Only include ports that carry audio or video signal. Do NOT include management, 
 - **Fixed channel count.** Most RF devices have a fixed channel count — a 4-channel receiver is always 4 channels. Use `rf_max_channels` to declare this. Only use `rf_min_channels` (with a value less than `rf_max_channels`) for the rare devices with truly flexible channel allocation (e.g., Shure AD-PSM, Sennheiser Spectera).
 - **No bridges.** With antenna ports removed, RF devices don't need bridge declarations. The audio outputs are the device's signal outputs — there's no internal routing to model.
 
-#### `rf_max_channels` means independent RF transmit/receive paths — NOT audio inputs
+#### RF Subtype Reference
+
+The `rf_subtype` meta key describes the device's RF role:
+
+| Subtype | Direction | Example | Notes |
+|---------|-----------|---------|-------|
+| `radio-mic` | RX only | Shure AD4Q, Sennheiser EW-DX | Receives wireless mics; outputs audio to mixing console |
+| `iem` | TX only | Shure PSM1000, Sennheiser SR IEM | Transmits IEM mixes to bodypacks; inputs audio from console |
+| `bidirectional` | RX + TX | Sennheiser Spectera Base Station | Receives mics AND transmits IEM simultaneously; all audio I/O is shared (no separate "mic out" vs "IEM out" connectors) |
+
+**Key distinction:** A bidirectional system's audio outputs and inputs serve dual purposes. Which Dante/MADI channels are mics vs IEM is configured per-instance, not expressed in the template.
+
+#### IEM Channel Configuration: Flexible Mono vs Stereo Bodypack Modes
+
+IEM transmitters allow users to dynamically configure each RF transmit channel as either **stereo** (1 bodypack receiving L+R mix) or **mono** (1 bodypack receiving 1-ch mix). This flexibility is per-instance, not per-template.
+
+**How it works:**
+1. Template declares the base audio inputs (e.g., `Audio_In[1..2]` for stereo sources or Dante streams)
+2. At runtime, when user places the device on canvas, the device builder UI shows "IEM CHANNELS" with Add Stereo / Add Mono buttons
+3. User builds the configuration by clicking buttons to add bodypacks
+4. Each entry takes up capacity: stereo uses 2 audio channels, mono uses 1
+5. This is stored per-instance in `iemChannelModes` (array of `'stereo' | 'mono'`), not in the template
+
+**Example — PSM1000 P10T (single-channel IEM transmitter, fixed):**
+```
+template PSM1000_P10T {
+  meta {
+    manufacturer: "Shure"
+    model: "PSM1000 P10T"
+    category: "IEM Transmitter"
+    kind: "rf-system"
+    rf_subtype: "iem"
+    rf_max_channels: 2  # Can be 1 stereo or 2 mono bodypacks
+  }
+  ports {
+    Audio_In[1..2]: in(XLR) [Analogue]  # Stereo L+R inputs
+    Loop_Out[1..2]: out(TRS_14) [Analogue]
+  }
+}
+```
+
+At runtime, user can configure:
+- 1 Stereo bodypack (uses both audio inputs as L+R mix)
+- 2 Mono bodypacks (input 1 = mix A, input 2 = mix B)
+- Or mix: 1 Stereo + 0 Mono, etc.
+
+**Multi-channel example — Sennheiser Spectera Base Station (bidirectional, 32-channel capacity):**
+
+Template:
+```
+template Spectera_Base_Station {
+  meta {
+    manufacturer: "Sennheiser"
+    model: "Spectera Base Station"
+    kind: "rf-system"
+    rf_subtype: "bidirectional"
+    rf_max_channels: 32
+  }
+  ports {
+    Dante_In[1..32]: in(etherCON) [Dante]   # TX: IEM mixes (32 channels)
+    Dante_Out[1..32]: out(etherCON) [Dante]  # RX: Wireless mic channels (32)
+  }
+}
+```
+
+Users can configure per-instance:
+- Channels 1–4: 2 Stereo bodypacks (4 audio channels)
+- Channels 5–12: 8 Mono bodypacks (8 audio channels)
+- Channels 13–32: 10 Stereo bodypacks (20 audio channels)
+- Total: 32 audio channels used across 20 bodypacks
+
+The template just provides the base capacity (32 channels); the runtime UI handles bodypack allocation per-instance.
+
+#### `rf_max_channels` is a mono audio channel budget — stereo counts as 2, mono counts as 1
 
 This is the most common mistake when building IEM templates.
 
-**For radio mic receivers:** `rf_max_channels` = number of receiver channels (bodypacks the unit receives from). A 4-channel receiver = `rf_max_channels: 4`.
+**For radio mic receivers:** `rf_max_channels` = number of receiver channels (bodypacks the unit receives from). A 4-channel receiver = `rf_max_channels: 4`. Each receiver channel is mono, so count = number of bodypacks.
 
-**For IEM transmitters:** `rf_max_channels` = number of independent RF transmit channels (how many separate bodypack receivers the transmitter feeds). The stereo L/R audio inputs are ports — they are NOT IEM channels.
+**For IEM transmitters:** `rf_max_channels` = total mono audio channel budget. Each stereo IEM feed costs 2; each mono IEM feed costs 1. A transmitter that supports 2 stereo IEM feeds = `rf_max_channels: 4`. A transmitter that supports 8 stereo IEM feeds = `rf_max_channels: 16`.
+
+```
+# WRONG — treating stereo pairs as the unit
+template PSM1000_P10T {
+  meta { rf_max_channels: 2 }   # ← wrong: 2 stereo pairs = 4 audio channels
+}
+
+# CORRECT — mono audio channel budget
+template PSM1000_P10T {
+  meta { rf_max_channels: 4 }   # ← 2 stereo × 2 channels each = 4
+}
+```
 
 ```
 # WRONG — confusing L/R audio inputs with IEM channels
@@ -267,8 +419,39 @@ Console_Network_Out: out(RJ45) [Console_Link, console_link]
 
 Key distinction: `console_link` goes on the **chassis-level** engine link, never on expansion cards that happen to use the same protocol.
 
-### Card slot format vs slot name
-Slot syntax: `slot MY_Slot[1..3]: MY_Card` — the name (`MY_Slot`) is used for connections, the format after the colon (`MY_Card`) must match what cards declare in `fits`. The loader auto-resolves compatible cards by matching `fits` to slot format.
+### Card Slot Declaration
+
+**Location:** Slot declarations go at the **template top level**, after the `ports { }` block. They are NOT nested inside a `slots { }` block.
+
+**Syntax:**
+```
+template MyDevice {
+  meta { ... }
+  ports { ... }
+  slot MY_Slot[1..3]: MY_Format
+}
+```
+
+**Components:**
+- `slot` — keyword
+- `MY_Slot` — slot name (used for addressing in instances)
+- `[1..3]` — range (how many slots of this type exist)
+- `MY_Format` — format identifier (cards declare `fits: "MY_Format"` to match)
+
+**Card matching:** The loader auto-resolves compatible cards by matching `fits` to slot format. Cards can be any template with `kind: "card"` and `fits: "FORMAT_NAME"`.
+
+**Example — Video router with 32 I/O card slots:**
+```
+template EQX16 {
+  meta {
+    manufacturer: "Evertz"
+    model: "EQX16"
+    category: "Video Router"
+  }
+  ports { ... }
+  slot IO_Slot[1..32]: IO_Slot
+}
+```
 
 ## User Device Builder Protocol Picker
 
@@ -308,16 +491,90 @@ The user-facing device builder (`DeviceInterfaceEditor.vue` → `TRANSPORT_PROTO
 - Auditing a tier-3 device template (does it use protocols the picker exposes that maybe shouldn't be there?)
 - Field reports of "I built X with the builder but it doesn't work in my system" (the protocol might fail the test)
 
+## Common Patterns
+
+### Multi-Slot Optional Expansion
+
+When a device has multiple independent expansion card slots (not daisy-chained), declare them as a range:
+
+```
+template Spectera_Base_Station {
+  meta {
+    manufacturer: "Sennheiser"
+    model: "Spectera Base Station"
+    kind: "rf-system"
+    rf_subtype: "bidirectional"
+  }
+  ports {
+    # Dante primary (required)
+    Dante_Pri_In[1..32]: in(RJ45) [Dante]
+    Dante_Pri_Out[1..32]: out(RJ45) [Dante]
+
+    # Dante secondary (redundant backup)
+    Dante_Sec_In[1..32]: in(RJ45) [Dante, redundant]
+    Dante_Sec_Out[1..32]: out(RJ45) [Dante, redundant]
+
+    # Word clock
+    WordClock_In: in(BNC_75) [WordClock]
+    WordClock_Out: out(BNC_75) [WordClock]
+  }
+
+  # Two independent MADI expansion slots
+  # User can install BNC or OM (optical) cards in each
+  slot MADI[1..2]: MADI_Expansion
+}
+```
+
+Cards that fit this slot:
+```
+template Spectera_MADI_BNC {
+  meta {
+    manufacturer: "Sennheiser"
+    model: "Spectera MADI Card (BNC)"
+    kind: "card"
+    fits: "MADI_Expansion"
+  }
+  ports {
+    MADI_In[1..64]: in(BNC_75) [MADI]
+    MADI_Out[1..64]: out(BNC_75) [MADI]
+  }
+}
+
+template Spectera_MADI_OM {
+  meta {
+    manufacturer: "Sennheiser"
+    model: "Spectera MADI Card (OM)"
+    kind: "card"
+    fits: "MADI_Expansion"
+  }
+  ports {
+    MADI_In[1..64]: in(SC_Fiber) [MADI]
+    MADI_Out[1..64]: out(SC_Fiber) [MADI]
+  }
+}
+```
+
+**At runtime,** when user places Spectera_Base_Station on canvas:
+- Slot MADI[1] can hold Spectera_MADI_BNC or Spectera_MADI_OM
+- Slot MADI[2] can hold Spectera_MADI_BNC or Spectera_MADI_OM
+- User picks independently which card type (or none) for each slot
+- All cards with `fits: "MADI_Expansion"` are available to choose from (future cards too)
+
+This pattern is **flexible and forward-compatible**: if a new MADI card variant ships later, just add a new card template with `fits: "MADI_Expansion"` and users can select it immediately.
+
 ## Checklist
 
 Run through before declaring any template done:
 
 - [ ] Specs researched — channel counts and connectors verified against manufacturer docs
+- [ ] **Every template corresponds to a real product** — do not add variant templates (e.g. a "Dante version") unless research explicitly confirms that variant exists. If unsure, omit it and flag the gap rather than inventing a device.
 - [ ] Device type correct — see taxonomy above. Key: Stage Core = XLR only (no network), Fixed Converter = hardwired routing (must have bridges), Processor = flexible routing (no bridges except Tier-3 devices)
 - [ ] For IEM transmitters: `rf_max_channels` = number of RF transmit channels (NOT audio input count)
 - [ ] Signal ports only — no management, control, or network control ports
 - [ ] Port names unique — especially redundant ports use `_Pri`/`_Sec` or `_A`/`_B` suffixes
 - [ ] Direction model correct for each protocol
+- [ ] **MADI ports all have `[1..64]` channel range** — bare `MADI_Port: in(SFP) [MADI]` is wrong; mirrored coax outputs are two separate named ports (`_1`/`_2`), not `[1..2]`
+- [ ] **USB Audio ports have an explicit channel count** — `USB[1..N]: io(USB) [USB_Audio]` where N = the device's USB audio stream depth per direction
 - [ ] Connectors match Device Builder dropdown values (BNC_50 for RF antennas, BNC_75 for video/wordclock)
 - [ ] Template name is model-only (no manufacturer prefix)
 - [ ] Card slots use established format names (MY_Slot, DMI_Slot, etc.)

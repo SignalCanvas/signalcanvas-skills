@@ -1,0 +1,5 @@
+{
+  "name": "patchlang-architecture",
+  "description": "Enforces the architecture boundary between PatchLang (.patch) and the JSON sidecar (.layout.json) in the SignalCanvas frontend. Use whenever writing or modifying code that touches device data, connections, the canvas scene store, the emitter, the loader, or the sidecar JSON.",
+  "version": "1.0.0"
+}

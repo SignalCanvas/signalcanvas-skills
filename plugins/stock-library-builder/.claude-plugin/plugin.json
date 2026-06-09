@@ -1,0 +1,5 @@
+{
+  "name": "stock-library-builder",
+  "description": "Builds, edits, and audits device templates in the SignalCanvas stock library (src/data/stdlib/). Covers manufacturer device patterns, channel counts, connector types, port definitions, and the physical-vs-virtual channel boundary.",
+  "version": "1.0.0"
+}
