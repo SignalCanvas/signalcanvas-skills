@@ -42,6 +42,26 @@
       "name": "signalcanvas-testing",
       "source": "./plugins/signalcanvas-testing",
       "description": "SignalCanvas test automation: /scbt (Playwright browser trace), /scpt (Vitest signal flow), /scft (label scanner)"
+    },
+    {
+      "name": "stock-library-builder",
+      "source": "./plugins/stock-library-builder",
+      "description": "Build, edit, or audit device templates in the SignalCanvas stock library (src/data/stdlib/) — channel counts, connector types, port definitions, card slot templates"
+    },
+    {
+      "name": "patchlang-architecture",
+      "source": "./plugins/patchlang-architecture",
+      "description": "Enforces the architecture boundary between PatchLang (.patch) and the JSON layout sidecar — use when touching device data, connection types, canvas scene store, emitter, or loader"
+    },
+    {
+      "name": "signalcanvas-packaging",
+      "source": "./plugins/signalcanvas-packaging",
+      "description": "Package a new SignalCanvas release via /scpkg — picks branch, bumps version, updates changelog and BETA-README, builds the .pkg installer"
+    },
+    {
+      "name": "context-handoff",
+      "source": "./plugins/context-handoff",
+      "description": "Write a HANDOFF.md at the active project root so context can be cleared and resumed cleanly in a fresh session"
     }
   ]
 }
