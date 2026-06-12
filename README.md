@@ -20,6 +20,7 @@ Claude Code picks up skills from `~/.claude/skills/` automatically.
 | `code-rules` | Any code task — enforces file size, DRY, naming, and error handling rules |
 | `signalcanvas-builder` | Building or importing a signal flow into SignalCanvas — from conversation, CSV/XLSX patch lists, or screenshots of Visio/handwritten diagrams |
 | `stock-library-builder` | Building, editing, or auditing device templates in the SignalCanvas stock library (`src/data/stdlib/`) |
+| `context-handoff` | Write a HANDOFF.md so you can clear context and resume cleanly in a fresh session |
 
 ## Slash Commands
 
